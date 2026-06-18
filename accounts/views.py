@@ -8,6 +8,8 @@ from .serializers import RegisterSerializer, UserSerializer
 from .permissions import IsTeacherOrAdmin, IsOwnerOrAdmin
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework.permissions import IsAuthenticated
+from .serializers import ChangePasswordSerializer
 
 import requests
 from urllib.parse import urlencode
@@ -195,3 +197,21 @@ class GoogleOAuthCallbackView(APIView):
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
         })
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *files, **kwargs):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        
+        if serializer.is_valid():
+            user = request.user
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            
+            return Response(
+                {"detail": "Пароль изменён."}, 
+                status=status.HTTP_200_OK
+            )
+            
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
