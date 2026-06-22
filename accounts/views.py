@@ -8,12 +8,12 @@ from .serializers import RegisterSerializer, UserSerializer
 from .permissions import IsTeacherOrAdmin, IsOwnerOrAdmin
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework.permissions import IsAuthenticated
-from .serializers import ChangePasswordSerializer
 
 import requests
 from urllib.parse import urlencode
 from django.conf import settings
+
+from .tasks import send_welcome_email
 
 GOOGLE_AUTH_URL     = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL    = "https://oauth2.googleapis.com/token"
@@ -30,18 +30,16 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         user = serializer.save()
 
-        cache.delete("users:all")
+        send_welcome_email.delay(user.email, user.full_name)
 
         refresh = RefreshToken.for_user(user)
-
         return Response({
             "user": UserSerializer(user).data,
             "access": str(refresh.access_token),
             "refresh": str(refresh),
-        }
+        }, status=status.HTTP_201_CREATED
         )
 
 class MeView(APIView):
@@ -197,21 +195,3 @@ class GoogleOAuthCallbackView(APIView):
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
         })
-
-class ChangePasswordView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, *files, **kwargs):
-        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
-        
-        if serializer.is_valid():
-            user = request.user
-            user.set_password(serializer.validated_data['new_password'])
-            user.save()
-            
-            return Response(
-                {"detail": "Пароль изменён."}, 
-                status=status.HTTP_200_OK
-            )
-            
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

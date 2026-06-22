@@ -9,9 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-DEBUG = os.getenv("DEBUG") == "True"
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_celery_beat',
 
     "rest_framework",
     "rest_framework_simplejwt",
@@ -111,6 +112,8 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/1")
+
 GOOGLE_OAUTH_CLIENT_ID      = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET  = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 GOOGLE_OAUTH_REDIRECT_URI   = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
@@ -118,11 +121,27 @@ GOOGLE_OAUTH_REDIRECT_URI   = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': "redis://127.0.0.1:6379/1",
+        'LOCATION': REDIS_URL,
         'OPTIONS': {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
     }
 }
 
-CACHE_TTL = 60 * 15
+CACHE_TTL = int(os.getenv("CACHE_TTL", 900))  
+
+CELERY_BROKER_URL = REDIS_URL 
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "Asia/Bishkek")
+
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")  
