@@ -8,6 +8,7 @@ from .serializers import RegisterSerializer, UserSerializer
 from .permissions import IsTeacherOrAdmin, IsOwnerOrAdmin
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework.viewsets import ModelViewSet
 
 import requests
 from urllib.parse import urlencode
@@ -41,6 +42,11 @@ class RegisterView(generics.CreateAPIView):
             "refresh": str(refresh),
         }, status=status.HTTP_201_CREATED
         )
+    
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        
+        cache.delete("users:all")
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -195,3 +201,18 @@ class GoogleOAuthCallbackView(APIView):
             "refresh": str(refresh),
             "user": UserSerializer(user).data,
         })
+    
+    class UserViewSet(ModelViewSet):
+    
+        def list(self, request, *args, **kwargs):
+            cache_key = "users:all"
+            cached_data = cache.get(cache_key)
+            
+            if cached_data is not None:
+                return Response(cached_data)
+            
+            response = super().list(request, *args, **kwargs)
+            
+            cache.set(cache_key, response.data, timeout=600)
+            
+            return response
